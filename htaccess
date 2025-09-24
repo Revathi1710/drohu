@@ -1,0 +1,25 @@
+# Prevent directory listing
+Options -Indexes
+
+# Protect sensitive files
+<FilesMatch "(login\.php|logout\.php|connection\.php)">
+    Require all denied
+</FilesMatch>
+
+# Redirect all other requests to login.php if not logged in (optional)
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^.*$ login.php [L]
+
+# Security headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# Protect .htaccess itself
+<Files ".htaccess">
+    Require all denied
+</Files>
