@@ -34,6 +34,6 @@ if (isset($_COOKIE['rememberme'])) {
 }
 
 // If no session and no valid cookie → redirect
-header("Location: login.php");
+header("Location: index.php");
 exit();
 ?>
