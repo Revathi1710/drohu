@@ -35,10 +35,7 @@ function short_address(array $a): string {
 $cart_items = [];
 $total_price = 0.0;
 if ($userId > 0) {
-    $sql = "SELECT ac.quantity, p.id AS product_id, p.product_name, p.product_image, p.selling_price,ac.id
-            FROM addcart ac
-            JOIN product p ON ac.prod_id = p.id
-            WHERE ac.user_id = ?";
+    $sql = "SELECT ac.id, ac.quantity, p.id AS product_id, p.product_name, p.product_image, p.selling_price FROM addcart ac JOIN product p ON ac.prod_id = p.id WHERE ac.user_id = ?";
     $stmt = $con->prepare($sql);
     $stmt->bind_param("i", $userId);
     $stmt->execute();
@@ -56,45 +53,36 @@ if ($userId > 0) {
 $user_addresses = [];
 $selected_address = null;
 if ($userId > 0) {
-    $sql_addresses = "SELECT id, door_no, pincode, address_label, street_address, city, state, receiver_name, receiver_number
-                      FROM address_details
-                      WHERE user_id = ?
-                      ORDER BY id DESC";
+    $sql_addresses = "SELECT id, door_no, pincode, address_label, street_address, city, state, receiver_name, receiver_number FROM address_details WHERE user_id = ? ORDER BY id DESC";
     $stmt_addresses = $con->prepare($sql_addresses);
     $stmt_addresses->bind_param("i", $userId);
     $stmt_addresses->execute();
     $result_addresses = $stmt_addresses->get_result();
     while ($row = $result_addresses->fetch_assoc()) {
         $user_addresses[] = $row;
-        if ($selected_address === null && ($selectedAddressId === 0 || (int)$row['id'] === $selectedAddressId)) {
+        if ($selected_address === null && ((int)$row['id'] === $selectedAddressId || $selectedAddressId === 0)) {
             $selected_address = $row;
+            $_SESSION['selected_address_id'] = $row['id'];
         }
     }
     $stmt_addresses->close();
-
-    // If a saved id didn't match anything, clear it
-    if ($selected_address === null && $selectedAddressId !== 0) {
-        unset($_SESSION['selected_address_id']);
-    }
 }
+
+$has_items = count($cart_items) > 0;
+$to_pay = $total_price;
 
 // Handle remove item
 if (isset($_POST['remove-item'])) {
     $itemId = (int) $_POST['item_id'];
-
     if ($itemId > 0) {
-        $stmt = $con->prepare("DELETE FROM addcart WHERE id = ?");
-        $stmt->bind_param("i", $itemId);
+        $stmt = $con->prepare("DELETE FROM addcart WHERE id = ? AND user_id = ?");
+        $stmt->bind_param("ii", $itemId, $userId);
         $stmt->execute();
         $stmt->close();
     }
-
-    // Refresh page after removing
     header("Location: cart.php");
     exit();
 }
-$has_items = count($cart_items) > 0;
-$to_pay = $total_price ;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -126,8 +114,6 @@ $to_pay = $total_price ;
     .cta-inner{ max-width:520px; margin:0 auto; padding:12px; display:flex; gap:10px; }
     .btn-cta{ flex:1; padding:14px 16px; font-weight:700; border:none; border-radius:10px; background:#008b9b; color:#fff; }
     .btn-cta:disabled{ background:#cfd4dc; color:#7b8794; }
-
-    /* Bottom sheet modal (shared) */
     .modal.modal-sheet .modal-dialog{ margin:0; position:fixed; bottom:0; left:0; right:0; width:auto; }
     .modal.modal-sheet .modal-content{ border-radius:16px 16px 0 0; border:0; box-shadow:0 -6px 24px rgba(0,0,0,.15); }
     .modal.modal-sheet .modal-header{ border:0; padding:14px 16px 0 16px; }
@@ -135,8 +121,6 @@ $to_pay = $total_price ;
     .saved-address{ border:1px solid #ececf2; border-radius:12px; padding:12px; margin-bottom:10px; cursor:pointer; }
     .saved-address.selected{ border-color:#1a9c46; background:#f1fff6; box-shadow:0 0 0 2px #c9f3d8 inset; }
     .chip{ display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px; background:#eaf5ff; color:#0b67d3; margin-left:6px; }
-
-    /* Payment sheet styling (Zepto-like) */
     .pay-summary{ background:#f8fafc; border:1px solid #eef2f7; border-radius:12px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
     .pay-group-title{ font-size:12px; color:#6b7280; font-weight:700; margin:12px 0 8px 0; }
     .upi-apps{ display:flex; gap:10px; overflow-x:auto; padding-bottom:2px; }
@@ -152,30 +136,15 @@ $to_pay = $total_price ;
     .pay-option.selected{ border-color:#1a9c46; background:#f6fff9; box-shadow:0 0 0 2px #c9f3d8 inset; }
     .sheet-footer{ position:sticky; bottom:0; background:#fff; padding:12px 0 4px 0; }
     .btn-pay{ width:100%; padding:12px 14px; font-weight:800; border:none; border-radius:10px; background:#008b9b; color:#fff; }
-    .remove-cart-item{
-        border-radius: 8px;
-    background: #fff4f4;
-    color: #fb3737;
-    display: flex
-;
-    align-items: center;
-    justify-content: center;
-    margin-top: 10px;
-    border: 1px solid #ff0404;
-}
-    }
+    .remove-cart-item{ border-radius: 8px; background: #fff4f4; color: #fb3737; display: flex; align-items: center; justify-content: center; margin-top: 10px; border: 1px solid #ff0404; }
 </style>
 </head>
 <body>
-
 <div class="app-header container-narrow">
-    <a href="index.php" style="color:white"><i class="fa-solid fa-arrow-left"></i></a>
+    <a href="products.php" style="color:white"><i class="fa-solid fa-arrow-left"></i></a>
     <h5>Cart</h5>
 </div>
-
 <div class="container-narrow p-3 pb-5">
-
-    <!-- Address block -->
     <div class="section-card mb-3">
         <?php if ($selected_address): ?>
             <div class="row-item address-row" data-bs-toggle="modal" data-bs-target="#addressSheet">
@@ -197,12 +166,8 @@ $to_pay = $total_price ;
             </div>
         <?php endif; ?>
     </div>
-
-    <!-- Cart -->
     <div class="section-card mb-3">
-        <div class="row-item">
-            <strong>My Cart (<?= count($cart_items) ?>)</strong>
-        </div>
+        <div class="row-item"><strong>My Cart (<?= count($cart_items) ?>)</strong></div>
         <?php if (!$cart_items): ?>
             <div class="row-item"><span class="muted">Your cart is empty. Shop products to continue.</span></div>
         <?php else: ?>
@@ -212,187 +177,37 @@ $to_pay = $total_price ;
                     <div class="flex-grow-1">
                         <p class="cart-title"><?= h($it['product_name']) ?></p>
                         <div class="muted">Qty: <?= (int)$it['quantity'] ?></div>
-                       <form method="post">
-    <input type="hidden" name="item_id" value="<?= $it['id'] ?>">
-    <button type="submit" class="remove-cart-item" name="remove-item">Remove</button>
-</form>
-
-                        
+                        <form method="post"><input type="hidden" name="item_id" value="<?= $it['id'] ?>"><button type="submit" class="remove-cart-item" name="remove-item">Remove</button></form>
                     </div>
                     <div class="fw-semibold">₹<?= rupee($it['selling_price'] * $it['quantity']) ?></div>
-                   
                 </div>
             <?php endforeach; ?>
         <?php endif; ?>
     </div>
-
-    <!-- Bill Details -->
     <div class="section-card mb-3">
         <div class="row-item"><strong>Bill Details</strong></div>
         <div class="px-3">
             <div class="bill-line"><span>Item Total</span><span>₹<?= rupee($total_price) ?></span></div>
-       
             <hr class="my-2">
             <div class="bill-line fw-bold"><span>To Pay</span><span>₹<?= rupee($has_items ? $to_pay : 0) ?></span></div>
         </div>
     </div>
-
-    <!-- Info rows -->
     <div class="section-card mb-4">
-      <!--  <div class="row-item">
-            <div class="row-icon"><i class="fa-solid fa-hand-holding-heart"></i></div>
-            <div class="flex-grow-1">
-                <div class="fw-semibold">Delivery Partner Tip</div>
-                <div class="muted">This amount goes to your delivery partner</div>
-            </div>
-            <i class="fa-solid fa-chevron-right text-secondary"></i>
-        </div>-->
-        <div class="row-item">
-            <div class="row-icon"><i class="fa-regular fa-message"></i></div>
-            <div class="flex-grow-1">
-                <div class="fw-semibold">Delivery Instructions</div>
-                <div class="muted">Delivery partner will be notified</div>
-            </div>
-            <i class="fa-solid fa-chevron-right text-secondary"></i>
-        </div>
-        <div class="row-item">
-            <div class="row-icon"><i class="fa-solid fa-shield-heart"></i></div>
-            <div class="flex-grow-1">
-                <div class="fw-semibold">Delivery Partner's Safety</div>
-                <div class="muted">Learn how we ensure their safety</div>
-            </div>
-            <i class="fa-solid fa-chevron-right text-secondary"></i>
-        </div>
+        <div class="row-item"><div class="row-icon"><i class="fa-regular fa-message"></i></div><div class="flex-grow-1"><div class="fw-semibold">Delivery Instructions</div><div class="muted">Delivery partner will be notified</div></div><i class="fa-solid fa-chevron-right text-secondary"></i></div>
+        <div class="row-item"><div class="row-icon"><i class="fa-solid fa-shield-heart"></i></div><div class="flex-grow-1"><div class="fw-semibold">Delivery Partner's Safety</div><div class="muted">Learn how we ensure their safety</div></div><i class="fa-solid fa-chevron-right text-secondary"></i></div>
     </div>
 </div>
-
-<!-- Sticky footer CTA -->
 <div class="sticky-cta">
     <div class="cta-inner">
-        <button
-            class="btn-cta"
-            id="placeOrderBtn"
-            data-amount="<?= (float)$to_pay ?>"
-            <?= ($selected_address && $has_items) ? '' : 'disabled' ?>>
+        <button class="btn-cta" id="placeOrderBtn" data-amount="<?= (float)$to_pay ?>" <?= ($selected_address && $has_items) ? '' : 'disabled' ?>>
             <?= ($selected_address && $has_items) ? 'Proceed to Checkout • ₹'.rupee($to_pay) : 'Add address to place order' ?>
         </button>
     </div>
 </div>
-
-<!-- Address Bottom Sheet -->
-<div class="modal fade modal-sheet" id="addressSheet" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-          <div class="mx-auto" style="width:40px;height:4px;border-radius:999px;background:#d9d9de;"></div>
-      </div>
-      <div class="modal-body">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="m-0 fw-bold">Select Address</h6>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-
-        <a href="add_address.php" class="text-decoration-none">
-            <div class="add-address-pill mb-3"><i class="fa-solid fa-plus me-2"></i>Add New Address</div>
-        </a>
-
-        <?php if ($user_addresses): ?>
-            <div class="mb-2 fw-semibold text-secondary">Saved Addresses</div>
-            <?php foreach ($user_addresses as $addr): ?>
-                <?php $isSel = ($selected_address && (int)$selected_address['id'] === (int)$addr['id']); ?>
-                <div class="saved-address <?= $isSel ? 'selected' : '' ?>" data-id="<?= (int)$addr['id'] ?>">
-                    <div class="d-flex align-items-start">
-                        <div class="me-2 text-success"><i class="fa-solid fa-house"></i></div>
-                        <div class="flex-grow-1">
-                            <div class="fw-semibold">
-                                <?= h($addr['address_label'] ?: 'Home') ?>
-                                <?php if ($isSel): ?><span class="chip">Selected</span><?php endif; ?>
-                            </div>
-                            <div class="muted"><?= h(short_address($addr)) ?></div>
-                        </div>
-                        <i class="fa-solid fa-chevron-right text-secondary"></i>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <div class="muted">No addresses saved yet.</div>
-        <?php endif; ?>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Payment Bottom Sheet -->
-<div class="modal fade modal-sheet" id="paymentSheet" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-          <div class="mx-auto" style="width:40px;height:4px;border-radius:999px;background:#d9d9de;"></div>
-      </div>
-      <div class="modal-body">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="m-0 fw-bold">Choose payment method</h6>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-
-        <div class="pay-summary">
-            <div>
-                <div class="fw-bold">To Pay</div>
-                <div class="text-secondary small">
-                    <?php if ($selected_address): ?>
-                        Deliver to <?= h($selected_address['address_label'] ?: 'Home') ?>
-                    <?php else: ?>
-                        Select address to continue
-                    <?php endif; ?>
-                </div>
-            </div>
-            <div class="fw-bolder fs-5">₹<?= rupee($has_items ? $to_pay : 0) ?></div>
-        </div>
-
-       <!-- <div class="pay-group-title">UPI apps</div>
-        <div class="upi-apps" id="upiApps">
-            <div class="upi-app selected" data-provider="gpay">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/1/13/Google_Pay_%28GPay%29_Logo_%282018-2020%29.svg" alt="GPay">
-                <div class="label">GPay</div>
-            </div>
-            <div class="upi-app" data-provider="phonepe">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/f/f2/PhonePe_Logo.svg" alt="PhonePe">
-                <div class="label">PhonePe</div>
-            </div>
-            <div class="upi-app" data-provider="paytm">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/6/6a/Paytm_logo.png" alt="Paytm">
-                <div class="label">Paytm</div>
-            </div>
-        </div>-->
-
-        <div class="pay-group-title">Other options</div>
-        <div class="pay-option selected" data-method="razorpay">
-            <div class="icon"><i class="fa-solid fa-credit-card"></i></div>
-            <div class="flex-grow-1">
-                <div class="title">Card / UPI / Netbanking (Razorpay)</div>
-                <div class="sub">Pay securely online</div>
-            </div>
-            <i class="fa-solid fa-check text-success"></i>
-        </div>
-        <div class="pay-option" data-method="cod">
-            <div class="icon"><i class="fa-solid fa-money-bill-wave"></i></div>
-            <div class="flex-grow-1">
-                <div class="title">Cash on Delivery (COD)</div>
-                <div class="sub">Pay with cash when delivered</div>
-            </div>
-        </div>
-
-        <div class="sheet-footer">
-            <button class="btn-pay" id="payConfirmBtn">Pay ₹<?= rupee($has_items ? $to_pay : 0) ?></button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
+<div class="modal fade modal-sheet" id="addressSheet" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><div class="mx-auto" style="width:40px;height:4px;border-radius:999px;background:#d9d9de;"></div></div><div class="modal-body"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0 fw-bold">Select Address</h6><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><a href="add_address.php" class="text-decoration-none"><div class="add-address-pill mb-3"><i class="fa-solid fa-plus me-2"></i>Add New Address</div></a><?php if ($user_addresses): ?><div class="mb-2 fw-semibold text-secondary">Saved Addresses</div><?php foreach ($user_addresses as $addr): ?><?php $isSel = ($selected_address && (int)$selected_address['id'] === (int)$addr['id']); ?><div class="saved-address <?= $isSel ? 'selected' : '' ?>" data-id="<?= (int)$addr['id'] ?>"><div class="d-flex align-items-start"><div class="me-2 text-success"><i class="fa-solid fa-house"></i></div><div class="flex-grow-1"><div class="fw-semibold"><?= h($addr['address_label'] ?: 'Home') ?><?php if ($isSel): ?><span class="chip">Selected</span><?php endif; ?></div><div class="muted"><?= h(short_address($addr)) ?></div></div><i class="fa-solid fa-chevron-right text-secondary"></i></div></div><?php endforeach; ?><?php else: ?><div class="muted">No addresses saved yet.</div><?php endif; ?></div></div></div></div>
+<div class="modal fade modal-sheet" id="paymentSheet" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><div class="mx-auto" style="width:40px;height:4px;border-radius:999px;background:#d9d9de;"></div></div><div class="modal-body"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0 fw-bold">Choose payment method</h6><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="pay-summary"><div><div class="fw-bold">To Pay</div><div class="text-secondary small"><?php if ($selected_address): ?>Deliver to <?= h($selected_address['address_label'] ?: 'Home') ?><?php else: ?>Select address to continue<?php endif; ?></div></div><div class="fw-bolder fs-5">₹<?= rupee($has_items ? $to_pay : 0) ?></div></div><div class="pay-group-title">Other options</div><div class="pay-option selected" data-method="razorpay"><div class="icon"><i class="fa-solid fa-credit-card"></i></div><div class="flex-grow-1"><div class="title">Card / UPI / Netbanking (Razorpay)</div><div class="sub">Pay securely online</div></div><i class="fa-solid fa-check text-success"></i></div><div class="pay-option" data-method="cod"><div class="icon"><i class="fa-solid fa-money-bill-wave"></i></div><div class="flex-grow-1"><div class="title">Cash on Delivery (COD)</div><div class="sub">Pay with cash when delivered</div></div></div><div class="sheet-footer"><button class="btn-pay" id="payConfirmBtn">Pay ₹<?= rupee($has_items ? $to_pay : 0) ?></button></div></div></div></div>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
 <script>
 (function(){
     const hasItems = <?= $has_items ? 'true' : 'false' ?>;
@@ -403,7 +218,6 @@ $to_pay = $total_price ;
     const paymentSheetEl = document.getElementById('paymentSheet');
     const paymentSheet = paymentSheetEl ? bootstrap.Modal.getOrCreateInstance(paymentSheetEl) : null;
 
-    // Open payment sheet on CTA click
     if (placeBtn) {
         placeBtn.addEventListener('click', function(){
             if (!hasItems || !hasAddress) return;
@@ -411,25 +225,6 @@ $to_pay = $total_price ;
         });
     }
 
-    // UPI apps selection
-    const upiApps = document.getElementById('upiApps');
-    let selectedProvider = 'gpay';
-    if (upiApps) {
-        upiApps.addEventListener('click', (e) => {
-            const card = e.target.closest('.upi-app');
-            if (!card) return;
-            upiApps.querySelectorAll('.upi-app').forEach(c => c.classList.remove('selected'));
-            card.classList.add('selected');
-            selectedProvider = card.dataset.provider || 'gpay';
-            // Ensure Razorpay option is highlighted when selecting UPI provider
-            document.querySelectorAll('.pay-option').forEach(o => o.classList.remove('selected'));
-            document.querySelector('.pay-option[data-method="razorpay"]').classList.add('selected');
-            selectedMethod = 'razorpay';
-            updateConfirmText();
-        });
-    }
-
-    // Payment options selection
     let selectedMethod = 'razorpay';
     document.querySelectorAll('.pay-option').forEach(opt => {
         opt.addEventListener('click', () => {
@@ -451,7 +246,6 @@ $to_pay = $total_price ;
     }
     updateConfirmText();
 
-    // Confirm click
     const payBtn = document.getElementById('payConfirmBtn');
     if (payBtn) {
         payBtn.addEventListener('click', () => {
@@ -459,15 +253,14 @@ $to_pay = $total_price ;
                 window.location.href = 'process_order.php?method=cod';
                 return;
             }
-            initiateRazorpayPayment(selectedProvider, toPay);
+            initiateRazorpayPayment(toPay);
         });
     }
 
-    // Razorpay integration
-    function initiateRazorpayPayment(provider, amountInRs){
+    function initiateRazorpayPayment(amountInRs){
         const totalAmountPaisa = Math.round(Number(amountInRs) * 100);
         const options = {
-            key: "rzp_live_fcHSAUVkadcMaw", // Replace with your Razorpay Key ID
+            key: "rzp_live_fcHSAUVkadcMaw",
             amount: totalAmountPaisa,
             currency: "INR",
             name: "Water Delivery App",
@@ -482,24 +275,23 @@ $to_pay = $total_price ;
                 contact: <?= json_encode($_SESSION['mobile_number']) ?>
             },
             theme: { color: "#1a9c46" },
-            method: { upi: true, card: true, netbanking: true, wallet: true },
-            notes: { upi_provider: provider }
         };
         const rzp = new Razorpay(options);
+        rzp.on('payment.failed', function (response){
+            const reason = response.error.reason || 'Payment failed';
+            window.location.href = "order_failed.php?reason=" + encodeURIComponent(reason);
+        });
         rzp.open();
     }
 
-    // Address picker wiring + save to session via AJAX
     const addressCards = document.querySelectorAll('.saved-address');
     const addressSheetEl = document.getElementById('addressSheet');
     const addressSheet = addressSheetEl ? bootstrap.Modal.getOrCreateInstance(addressSheetEl) : null;
-
     addressCards.forEach(card => {
         card.addEventListener('click', async () => {
             const id = Number(card.getAttribute('data-id'));
             addressCards.forEach(c => c.classList.remove('selected'));
             card.classList.add('selected');
-
             try {
                 const res = await fetch('update_selected_address.php', {
                     method: 'POST',
@@ -512,7 +304,6 @@ $to_pay = $total_price ;
                     const sub = document.querySelector('.address-row .sub');
                     if (title && data.address_label) title.textContent = 'Delivering to ' + data.address_label;
                     if (sub && data.short_address) sub.textContent = data.short_address;
-
                     const enabled = (data.has_items && data.selected);
                     placeBtn.disabled = !enabled;
                     placeBtn.textContent = enabled ? ('Proceed to Checkout • ₹' + (data.to_pay ?? '')) : 'Add address to place order';

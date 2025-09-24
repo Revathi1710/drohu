@@ -187,7 +187,7 @@ $placed = $order['created_at'] ? date('d M Y, h:i A', strtotime($order['created_
           <button class="btn btn-primary" id="btnSaveStatus"><i class="fa-solid fa-floppy-disk me-1"></i>Save status</button>
           <button class="btn btn-success" id="btnDelivered"><i class="fa-solid fa-check me-1"></i>Mark Delivered</button>
           <button class="btn btn-danger" id="btnCancel"><i class="fa-solid fa-xmark me-1"></i>Cancel Order</button>
-          <a class="btn btn-outline-secondary ms-auto" href="admin_orders.php"><i class="fa-regular fa-circle-left me-1"></i>Back</a>
+          <a class="btn btn-outline-secondary ms-auto" href="allorder.php"><i class="fa-regular fa-circle-left me-1"></i>Back</a>
         </div>
       </div>
       <div class="small text-muted mt-2">Quick actions call the same update endpoint used on the orders list.</div>

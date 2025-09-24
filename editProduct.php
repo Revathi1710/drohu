@@ -2,16 +2,25 @@
 include("connection.php");
 ini_set('display_errors', 0);
 
-if (isset($_POST['add'])) {
+if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
+    header('Location: allProduct.php');
+    exit;
+}
+
+$product_id = $_GET['id'];
+$status_message = '';
+
+// Handle form submission for updating the product
+if (isset($_POST['update'])) {
     $product_name = mysqli_real_escape_string($con, $_POST['product_name']);
     $capacity = mysqli_real_escape_string($con, $_POST['capacity']);
     $shelf_life = mysqli_real_escape_string($con, $_POST['shelf_life']);
     $purification = mysqli_real_escape_string($con, $_POST['purification']);
     $original_price = mysqli_real_escape_string($con, $_POST['original_price']);
-    $selling_price = mysqli_real_escape_string($con, $_POST['selling_price']); // Ensure this is also captured
-    $product_image = '';
+    $selling_price = mysqli_real_escape_string($con, $_POST['selling_price']);
+    $product_image = mysqli_real_escape_string($con, $_POST['current_image']);
 
-    // Handle the image upload
+    // Handle the new image upload
     if (isset($_FILES['image']) && $_FILES['image']['error'] == 0) {
         $target_dir = "uploads/";
         if (!is_dir($target_dir)) {
@@ -23,22 +32,35 @@ if (isset($_POST['add'])) {
         $target_file = $target_dir . $file_name;
 
         if (move_uploaded_file($_FILES["image"]["tmp_name"], $target_file)) {
+            // Delete the old image file if it exists and is not a default/placeholder image
+            if (!empty($_POST['current_image']) && file_exists($_POST['current_image'])) {
+                unlink($_POST['current_image']);
+            }
             $product_image = $target_file;
         } else {
-            echo "Sorry, there was an error uploading your file.";
+            $status_message = "Sorry, there was an error uploading your file.";
         }
     }
 
-    $sql = "INSERT INTO product (product_name, capacity, shelf_life, purification, original_price, selling_price, product_image) VALUES ('$product_name', '$capacity', '$shelf_life', '$purification', '$original_price', '$selling_price', '$product_image')";
-    mysqli_query($con, $sql);
-
-    if (mysqli_affected_rows($con) > 0) {
+    // Corrected SQL query to update product data and image path
+    $sql = "UPDATE product SET product_name='$product_name', capacity='$capacity', shelf_life='$shelf_life', purification='$purification', original_price='$original_price', selling_price='$selling_price', product_image='$product_image' WHERE id=$product_id";
+    
+    if (mysqli_query($con, $sql)) {
         header("Location: allProduct.php");
         exit;
     } else {
-        echo "Error: " . mysqli_error($con);
+        $status_message = "Error: " . mysqli_error($con);
     }
 }
+
+// Fetch the existing product data
+$query = "SELECT * FROM product WHERE id = $product_id";
+$result = mysqli_query($con, $query);
+if (mysqli_num_rows($result) === 0) {
+    header('Location: allProduct.php');
+    exit;
+}
+$product = mysqli_fetch_assoc($result);
 
 include("sidebar.php");
 ?>
@@ -48,7 +70,7 @@ include("sidebar.php");
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Add Product</title>
+    <title>Edit Product</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -78,25 +100,28 @@ include("sidebar.php");
         }
 
         body {
-            background: var(--light-bg);
-            font-family: 'Inter', sans-serif;
-            font-size: 0.9375rem; /* Slightly smaller base font size */
+             background: var(--light-bg);
+             font-family: 'Inter', sans-serif;
+             font-size: 0.9375rem;
         }
 
-      
+        .main-container {
+            min-height: 100vh;
+            padding: 1.5rem;
+        }
 
-      
+        
         .page-header {
             background: var(--white);
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow-md);
             padding: 1.5rem;
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
             border: 1px solid var(--border-color);
         }
         .page-title {
             color: var(--text-primary);
-            font-weight: 700;
+            font-weight: 600;
             font-size: 1.5rem;
             margin: 0;
             display: flex;
@@ -134,7 +159,7 @@ include("sidebar.php");
         .form-card-header h5 {
             margin: 0;
             font-weight: 600;
-            font-size: 1rem;
+            font-size: 1.125rem;
             display: flex;
             align-items: center;
             gap: 0.5rem;
@@ -154,7 +179,7 @@ include("sidebar.php");
             font-size: 1.125rem;
             margin-bottom: 1rem;
             padding-bottom: 0.5rem;
-            border-bottom: 2px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
             display: flex;
             align-items: center;
             gap: 0.5rem;
@@ -167,8 +192,8 @@ include("sidebar.php");
         .form-label {
             font-weight: 600;
             color: var(--text-primary);
-            margin-bottom: 0.25rem; /* Reduced margin */
-            font-size: 0.825rem; /* Slightly smaller font */
+            margin-bottom: 0.25rem;
+            font-size: 0.825rem;
             text-transform: uppercase;
             letter-spacing: 0.025em;
             display: flex;
@@ -182,9 +207,9 @@ include("sidebar.php");
         }
 
         .form-control {
-            border: 1px solid var(--border-color); /* Thinner border */
-            border-radius: var(--radius-sm); /* Sharper corners */
-            padding: 0.65rem 1rem; /* Reduced padding */
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 0.65rem 1rem;
             font-size: 0.875rem;
             transition: all 0.2s ease;
             background: var(--white);
@@ -192,7 +217,7 @@ include("sidebar.php");
 
         .form-control:focus {
             border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15); /* Blue glow */
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15);
             outline: none;
         }
 
@@ -213,7 +238,7 @@ include("sidebar.php");
             color: white;
             border: none;
             border-radius: var(--radius-sm);
-            padding: 0.75rem 2rem; /* Reduced padding */
+            padding: 0.75rem 2rem;
             font-size: 0.875rem;
             font-weight: 600;
             cursor: pointer;
@@ -236,10 +261,27 @@ include("sidebar.php");
         .submit-btn:active {
             transform: translateY(0);
         }
-
+        
         .required-indicator {
             color: var(--danger-color);
             font-weight: 700;
+        }
+        
+        .current-image-container {
+            margin-top: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            background: #fafbfc;
+        }
+        .current-image-container img {
+            width: 70px;
+            height: 70px;
+            object-fit: contain;
+            border-radius: var(--radius-sm);
         }
 
         @media (max-width: 768px) {
@@ -247,13 +289,13 @@ include("sidebar.php");
                 padding: 1rem;
             }
             .page-header {
-                padding: 1rem 1.5rem;
+                padding: 1.5rem;
             }
             .form-card-body {
                 padding: 1.5rem;
             }
             .page-title {
-                font-size: 1.25rem;
+                font-size: 1.5rem;
             }
             .submit-section {
                 margin: 1.5rem -1.5rem -1.5rem;
@@ -283,12 +325,19 @@ include("sidebar.php");
             <div class="page-header">
                 <h1 class="page-title">
                     <i class="fas fa-box"></i>
-                    Add New Product
+                    Edit Product
                 </h1>
-                <p class="page-subtitle">Add a new product to your inventory</p>
+                <p class="page-subtitle">Update product information in your inventory</p>
             </div>
+            
+            <?php if (!empty($status_message)): ?>
+                <div class="alert alert-danger" role="alert">
+                    <?= $status_message ?>
+                </div>
+            <?php endif; ?>
 
             <form action="" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="current_image" value="<?= htmlspecialchars($product['product_image']) ?>">
                 <div class="form-card">
                     <div class="form-card-header">
                         <h5>
@@ -309,7 +358,7 @@ include("sidebar.php");
                                         Product Name <span class="required-indicator">*</span>
                                     </label>
                                     <input type="text" class="form-control" name="product_name"
-                                           placeholder="Enter product name" required>
+                                           placeholder="Enter product name" value="<?= htmlspecialchars($product['product_name']) ?>" required>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">
@@ -317,7 +366,7 @@ include("sidebar.php");
                                         Capacity<span class="required-indicator">*</span>
                                     </label>
                                     <input type="text" class="form-control" name="capacity"
-                                           placeholder="Enter capacity" required>
+                                           placeholder="Enter capacity" value="<?= htmlspecialchars($product['capacity']) ?>" required>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">
@@ -325,7 +374,7 @@ include("sidebar.php");
                                         Original Price<span class="required-indicator">*</span>
                                     </label>
                                     <input type="text" class="form-control" name="original_price"
-                                           placeholder="Enter Original Price" required>
+                                           placeholder="Enter Original Price" value="<?= htmlspecialchars($product['original_price']) ?>" required>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">
@@ -333,7 +382,7 @@ include("sidebar.php");
                                         Selling Price<span class="required-indicator">*</span>
                                     </label>
                                     <input type="text" class="form-control" name="selling_price"
-                                           placeholder="Enter Selling Price" required>
+                                           placeholder="Enter Selling Price" value="<?= htmlspecialchars($product['selling_price']) ?>" required>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">
@@ -341,7 +390,7 @@ include("sidebar.php");
                                         Shelf Life <span class="required-indicator">*</span>
                                     </label>
                                     <input type="text" class="form-control" name="shelf_life"
-                                           placeholder="Enter shelf life" required>
+                                           placeholder="Enter shelf life" value="<?= htmlspecialchars($product['shelf_life']) ?>" required>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">
@@ -349,23 +398,29 @@ include("sidebar.php");
                                         Water Purification
                                     </label>
                                     <input type="text" class="form-control" name="purification"
-                                           placeholder="Enter water purification method">
+                                           placeholder="Enter water purification method" value="<?= htmlspecialchars($product['purification']) ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">
                                         <i class="fas fa-image"></i>
-                                        Image <span class="required-indicator">*</span>
+                                        Image
                                     </label>
-                                    <input type="file" class="form-control" name="image" required>
+                                    <input type="file" class="form-control" name="image">
+                                    <?php if (!empty($product['product_image'])): ?>
+                                        <div class="current-image-container">
+                                            <img src="<?= htmlspecialchars($product['product_image']) ?>" alt="Current Product Image">
+                                            <span>Current Image</span>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
 
                         <div class="submit-section">
                             <div class="d-flex justify-content-center">
-                                <button type="submit" class="submit-btn" name="add">
+                                <button type="submit" class="submit-btn" name="update">
                                     <i class="fas fa-save"></i>
-                                    Save Product
+                                    Update Product
                                 </button>
                             </div>
                         </div>

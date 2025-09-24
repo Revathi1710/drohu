@@ -188,51 +188,17 @@ $deliveredItemsByOrder = [];
   <meta name="theme-color" content="#7b2ff7">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
-
-<script>
-  const firebaseConfig = {
-  apiKey: "AIzaSyAHChNxtWWB4v28t8UQglk3OxCl13LBr-E",
-  authDomain: "deliveryapp-8b3ec.firebaseapp.com",
-  projectId: "deliveryapp-8b3ec",
-  storageBucket: "deliveryapp-8b3ec.firebasestorage.app",
-  messagingSenderId: "401322501798",
-  appId: "1:401322501798:web:443c04a655b131b0417667",
-  measurementId: "G-HJ91GC32GE"
-};
-
-  firebase.initializeApp(firebaseConfig);
-  const messaging = firebase.messaging();
-
-  // Request permission to receive notifications
-  Notification.requestPermission().then(permission => {
-    if (permission === 'granted') {
-      console.log('Notification permission granted.');
-      messaging.getToken({ vapidKey: 'YOUR_VAPID_KEY' }).then((token) => {
-        if (token) {
-          console.log('FCM Token:', token);
-          // Send token to backend to save against delivery person
-        } else {
-          console.log('No token available.');
-        }
-      }).catch(console.error);
-    } else {
-      console.log('Notification permission denied.');
-    }
-  });
-</script>
   <style>
     :root{
       --brand-start:#7b2ff7; --brand-end:#f107a3;
       --text:#1f2937; --muted:#6b7280; --surface:#ffffff; --bg:#fafafa;
       --radius-xl:22px; --radius-lg:18px; --radius-md:12px;
-      --shadow-lg:0 16px 44px rgba(0,0,0,.18); --shadow-md:0 10px 32px rgba(0,0,0,.12);
+      --shadow-lg:0 16px 44px rgba(0,0,0,.18); --shadow-md:0 10px 32px rgba(0,0,0,.12); --primary-blue: #1E90FF;
     }
     *{box-sizing:border-box}
     body{ background:var(--bg); color:var(--text); font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
     .hero{
-      background:linear-gradient(135deg,var(--brand-start),var(--brand-end));
+     background:linear-gradient(135deg, var(--primary-blue), #0056b3);
       color:#fff; padding: clamp(16px,5vw,28px) 18px calc(22px + env(safe-area-inset-top));
       border-bottom-left-radius: var(--radius-xl);
       border-bottom-right-radius: var(--radius-xl);
@@ -255,8 +221,8 @@ $deliveredItemsByOrder = [];
     }
     .btn-primary{
       border:none; border-radius:14px; padding:10px 14px; font-weight:700; letter-spacing:.2px;
-      background:linear-gradient(135deg,var(--brand-start),var(--brand-end));
-      box-shadow:0 8px 24px rgba(241,7,163,.24);
+      background:linear-gradient(135deg, var(--primary-blue), #0056b3);
+    
     }
     .btn-outline{
       background:#fff; border:2px solid #efe7ff; color:#5b36f0; border-radius:12px; font-weight:700;
@@ -417,7 +383,71 @@ $deliveredItemsByOrder = [];
         <?php endif; ?>
       </div>
     </div>
-  </main>
+  </main><!-- Bootstrap Modal -->
+<div class="modal fade" id="newOrderModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content shadow-lg">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title">New Order Allocated</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p id="newOrderText">You have a new order!</p>
+      </div>
+      <div class="modal-footer">
+        <a href="deliveryDashboard.php" class="btn btn-success">View Orders</a>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+<audio id="notifySound" src="notification.mp3" preload="auto"></audio>
+<!-- Load jQuery (must be above your custom script) -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<!-- Load Bootstrap -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+function playSound() {
+  var sound = document.getElementById("notifySound");
+  sound.play();
+}
+
+function checkNewOrders() {
+  $.ajax({
+    url: "checkNewOrders.php",
+    type: "GET",
+    success: function(response) {
+      if (response && response.trim() !== "0") {
+        // Show popup with order ID
+        $("#newOrderText").text("You have a new order allocated! Order ID #" + response);
+        var myModal = new bootstrap.Modal(document.getElementById('newOrderModal'));
+        myModal.show();
+
+        // Play sound
+        playSound();
+
+        // (Optional) Trigger mobile notification
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification("New Order Allocated", {
+            body: "Order ID #" + response,
+            icon: "order-icon.png" // add your icon
+          });
+        }
+      }
+    }
+  });
+}
+
+// Ask for notification permission
+if ("Notification" in window && Notification.permission !== "granted") {
+  Notification.requestPermission();
+}
+
+// Poll every 10 seconds
+setInterval(checkNewOrders, 10000);
+</script>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>

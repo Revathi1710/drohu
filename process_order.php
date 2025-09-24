@@ -1,81 +1,69 @@
 <?php
+// process_order.php
 session_start();
 include('connection.php');
 
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
-// Require login
 if (!isset($_SESSION['mobile_number'])) {
     header("Location: login.php");
     exit();
 }
 
-
 $paymentMethod = $_GET['method'] ?? 'cod';
 $razorpayPaymentId = $_GET['payment_id'] ?? null;
-
-// Selected address id saved during cart selection
 $selectedAddressId = (int)($_SESSION['selected_address_id'] ?? 0);
-
-// Sanitize simple strings
-$paymentMethod = $con->real_escape_string($paymentMethod);
-$razorpayPaymentId = $razorpayPaymentId !== null ? $con->real_escape_string($razorpayPaymentId) : null;
-
-// Verify selected address belongs to the user; otherwise null it
 $userId = (int)($_SESSION['user_id'] ?? 0);
-$addressIdForOrder = null;
-if ($selectedAddressId > 0 && $userId > 0) {
-    $stmt = $con->prepare("SELECT id FROM address_details WHERE id = ? AND user_id = ? LIMIT 1");
-    $stmt->bind_param("ii", $selectedAddressId, $userId);
-    $stmt->execute();
-    $res = $stmt->get_result();
-    if ($res->num_rows === 1) {
-        $addressIdForOrder = $selectedAddressId;
-    }
-    $stmt->close();
-}
-
-// Calculate total from session cart
-$total_amount = 0.0;
-foreach ($_SESSION['cart'] as $item) {
-    $qty = (int)$item['quantity'];
-    $price = (float)$item['price'];
-    $total_amount += $price * $qty;
-}
-
-$orderStatus = ($paymentMethod === 'cod') ? 'pending' : 'paid';
 
 try {
-    $con->begin_transaction();
+    // 1. Validate mandatory data
+    if ($userId === 0) {
+        throw new Exception("User not logged in.");
+    }
 
-    // Insert into orders with address_id
-    $sql_insert_order = "INSERT INTO `orders`
-        (user_id, address_id, total_amount, payment_method, payment_id, status)
-        VALUES (?, ?, ?, ?, ?, ?)";
+    $stmt_address = $con->prepare("SELECT id FROM address_details WHERE id = ? AND user_id = ? LIMIT 1");
+    $stmt_address->bind_param("ii", $selectedAddressId, $userId);
+    $stmt_address->execute();
+    $res_address = $stmt_address->get_result();
+    if ($res_address->num_rows === 0) {
+        throw new Exception("Missing or invalid delivery address.");
+    }
+    $addressIdForOrder = $selectedAddressId;
+    $stmt_address->close();
+
+    $stmt_cart = $con->prepare("SELECT quantity, prod_id, price FROM addcart WHERE user_id = ?");
+    $stmt_cart->bind_param("i", $userId);
+    $stmt_cart->execute();
+    $res_cart = $stmt_cart->get_result();
+    $cart_items_db = $res_cart->fetch_all(MYSQLI_ASSOC);
+    $stmt_cart->close();
+    
+    if (empty($cart_items_db)) {
+        throw new Exception("Empty cart.");
+    }
+    
+    $total_amount = 0.0;
+    foreach ($cart_items_db as $item) {
+        $total_amount += (float)$item['price'] * (int)$item['quantity'];
+    }
+
+    // 2. Start Transaction & Insert Order
+    $con->begin_transaction();
+    $orderStatus = ($paymentMethod === 'cod') ? 'pending' : 'paid';
+
+    $sql_insert_order = "INSERT INTO `orders` (user_id, address_id, total_amount, payment_method, payment_id, status) VALUES (?, ?, ?, ?, ?, ?)";
     $stmt_order = $con->prepare($sql_insert_order);
-    // user_id (i), address_id (i or null), total_amount (d), payment_method (s), payment_id (s or null), status (s)
-    $stmt_order->bind_param(
-        "iidsss",
-        $userId,
-        $addressIdForOrder,
-        $total_amount,
-        $paymentMethod,
-        $razorpayPaymentId,
-        $orderStatus
-    );
+    $stmt_order->bind_param("iidsss", $userId, $addressIdForOrder, $total_amount, $paymentMethod, $razorpayPaymentId, $orderStatus);
     $stmt_order->execute();
     $orderId = $con->insert_id;
     $stmt_order->close();
 
-    // Insert order items
-    $sql_insert_item = "INSERT INTO `order_items`
-        (order_id, product_id, product_name, price, quantity)
-        VALUES (?, ?, ?, ?, ?)";
+    // 3. Insert Order Items
+    $sql_insert_item = "INSERT INTO `order_items` (order_id, product_id, product_name, price, quantity) VALUES (?, ?, ?, ?, ?)";
     $stmt_item = $con->prepare($sql_insert_item);
-
-    foreach ($_SESSION['cart'] as $item) {
-        $productId = (int)$item['id'];
-        $productName = $item['name'];
+    foreach ($cart_items_db as $item) {
+        $productId = (int)$item['prod_id'];
+        $productName = 'Product Name Placeholder'; // Fetch from products table if needed
         $price = (float)$item['price'];
         $qty = (int)$item['quantity'];
         $stmt_item->bind_param("iisdi", $orderId, $productId, $productName, $price, $qty);
@@ -83,26 +71,28 @@ try {
     }
     $stmt_item->close();
 
+    // 4. Commit and Redirect to Success
     $con->commit();
 
-    // Clear session cart
-    unset($_SESSION['cart']);
-
-    // Also clear DB cart for this user (table name: addcart)
-    if ($userId > 0) {
-        $stmt_del = $con->prepare("DELETE FROM addcart WHERE user_id = ?");
-        $stmt_del->bind_param("i", $userId);
-        $stmt_del->execute();
-        $stmt_del->close();
-    }
+    $stmt_del = $con->prepare("DELETE FROM addcart WHERE user_id = ?");
+    $stmt_del->bind_param("i", $userId);
+    $stmt_del->execute();
+    $stmt_del->close();
 
     header("Location: order_success.php?order_id=" . $orderId);
     exit();
+
 } catch (Exception $e) {
+    // 5. Rollback and Redirect to Failed Page
     $con->rollback();
-    error_log("Order processing failed: " . $e->getMessage());
-    header("Location: order_failed.php");
+    error_log("Order processing failed for user {$userId}: " . $e->getMessage());
+    $orderId = $orderId ?? 0;
+    $reason = urlencode($e->getMessage());
+    header("Location: order_failed.php?order_id={$orderId}&reason={$reason}");
     exit();
 } finally {
-    $con->close();
+    if (isset($con)) {
+        $con->close();
+    }
 }
+?>

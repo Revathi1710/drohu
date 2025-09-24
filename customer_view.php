@@ -206,7 +206,7 @@ function status_badge_class(string $s): string {
             </div>
           </div>
           <div>
-            <a href="customers.php" class="btn btn-light btn-sm">Back</a>
+            <a href="allCustomer.php" class="btn btn-light btn-sm">Back</a>
           </div>
         </div>
       </header>

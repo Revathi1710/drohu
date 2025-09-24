@@ -2,6 +2,6 @@
 session_start();
 $_SESSION = [];
 session_destroy();
-header('Location: choose-login.php');
+header('Location: deliveryLogin.php');
 exit;
 ?>

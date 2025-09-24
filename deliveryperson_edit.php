@@ -88,17 +88,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $id > 0 && $person) {
         }
       } else {
         // Build dynamic UPDATE
-        $setParts = ['deliveryperson_name = ?', 'number = ?', 'email = ?', 'username = ?', 'pincode = ?'];
+        $setParts = ['deliveryperson_name = ?', 'number = ?', 'email = ?', 'username = ?', 'pincode = ?','password=?'];
         $types = 'sssss';
-        $values = [$deliveryperson_name, $number, $email, $username, $pincode];
+        $values = [$deliveryperson_name, $number, $email, $username, $pincode,$password_plain];
 
-        if ($password_plain !== '') {
-          $password_hashed = password_hash($password_plain, PASSWORD_DEFAULT);
-          $setParts[] = 'password = ?';
-          $types .= 's';
-          $values[] = $password_hashed;
-        }
-
+ 
         $types .= 'i';
         $values[] = $id;
 
@@ -139,46 +133,242 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $id > 0 && $person) {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
-  <style>
-    :root{
-      --brand-start:#7b2ff7; --brand-end:#f107a3;
-      --text:#1f2937; --muted:#6b7280; --surface:#ffffff; --bg:#fafafa;
-      --radius-xl:22px; --radius-lg:18px; --radius-md:12px;
-      --shadow-lg:0 16px 44px rgba(0,0,0,.18); --shadow-md:0 10px 32px rgba(0,0,0,.12);
-    }
-    *{box-sizing:border-box}
-    body{ background:var(--bg); color:var(--text); font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
-    .main-container{ padding:16px; margin-left:var(--sidebar-width); }
-    .hero{
-      background:linear-gradient(135deg,var(--brand-start),var(--brand-end));
-      color:#fff; padding: clamp(16px,5vw,28px) 18px calc(22px + env(safe-area-inset-top));
-      border-radius: var(--radius-xl);
-      box-shadow: var(--shadow-lg);
-      margin: 16px 0px;
-    }
-    .brand-title{ font-weight:800; letter-spacing:.3px; margin:0; font-size:clamp(18px,4.8vw,22px); }
-    .brand-sub{ opacity:.92; margin-top:6px; }
-    .container-narrow{width:100%; margin: 0 auto; padding: 12px 16px 28px; }
-    .card-elevated{ border:0; border-radius: var(--radius-lg); background:var(--surface); box-shadow: var(--shadow-md); }
-    .form-label{ font-weight:600; font-size:14px; margin-bottom:6px; }
-    .input-group-text{ background:#f3f4f6; border:none; }
-    .form-control{ border-radius: var(--radius-md); padding: 10px 12px; }
-    .btn-primary{
-      border:none; border-radius:14px; padding:12px 16px; font-weight:700; letter-spacing:.2px;
-      background:linear-gradient(135deg,var(--brand-start),var(--brand-end));
-      box-shadow:0 8px 24px rgba(241,7,163,.24);
-    }
-    .btn-primary:active{ transform: translateY(1px); }
-    .help{ font-size:12px; color:var(--muted); }
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet"><style>
+      :root {
+            --primary-color: #4A90E2;
+            --primary-hover: #3A7BC8;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --light-bg: #F0F4F8;
+            --white: #ffffff;
+            --border-color: #E0E6ED;
+            --text-primary: #212529;
+            --text-secondary: #6C757D;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 2px 4px 0 rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 4px 8px 0 rgba(0, 0, 0, 0.12);
+            --radius-sm: 0.25rem;
+            --radius-md: 0.35rem;
+            --radius-lg: 0.5rem;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+             background: var(--light-bg);
+             font-family: 'Inter', sans-serif;
+             font-size: 0.9375rem;
+        }
+
+        
+
+        .page-header {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+        .page-title {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 1.5rem;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .page-title i {
+            color: var(--primary-color);
+            font-size: 1.75rem;
+        }
+
+        .page-subtitle {
+            color: var(--text-secondary);
+            margin: 0.5rem 0 0 0;
+            font-size: 0.9rem;
+            font-weight: 400;
+        }
+
+        .form-card {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .form-card-header {
+            background: var(--white);
+            color: var(--text-primary);
+            padding: 1.25rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .form-card-header h5 {
+            margin: 0;
+            font-weight: 600;
+            font-size: 1.125rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-card-body {
+            padding: 2rem;
+        }
+
+        .form-section {
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 1.125rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-title i {
+            color: var(--primary-color);
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+            font-size: 0.825rem;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        .form-label i {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+
+        .form-control {
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 0.65rem 1rem;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+            background: var(--white);
+        }
+
+        .form-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15);
+            outline: none;
+        }
+
+        .form-control::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }
+
+        .submit-section {
+            background: #f8fafc;
+            margin: 2rem -2rem -2rem;
+            padding: 2rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .submit-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            padding: 0.75rem 2rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            min-width: 180px;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        .submit-btn:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+        
+        .required-indicator {
+            color: var(--danger-color);
+            font-weight: 700;
+        }
+        
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 1rem;
+            }
+            .page-header {
+                padding: 1.5rem;
+            }
+            .form-card-body {
+                padding: 1.5rem;
+            }
+            .page-title {
+                font-size: 1.5rem;
+            }
+            .submit-section {
+                margin: 1.5rem -1.5rem -1.5rem;
+                padding: 1.5rem;
+            }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="main-container">
-    <div class="hero">
-      <h1 class="brand-title">Edit Delivery Person</h1>
-      <p class="brand-sub mb-0">Update delivery partner details</p>
-    </div>
+ <div class="main-container">
+        <div class="form-container fade-in">
+            <div class="page-header">
+                <h1 class="page-title">
+                    <i class="fas fa-truck-fast"></i>
+                   Edit Delivery Person
+                </h1>
+                <p class="page-subtitle">Update delivery partner details</p>
+            </div>
+            
+ 
 
     <div class="card card-elevated p-4">
       <?php if ($successMessage): ?>
@@ -229,7 +419,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $id > 0 && $person) {
             <label class="form-label">Password (leave blank to keep unchanged)</label>
             <div class="input-group">
               <span class="input-group-text"><i class="bi bi-lock"></i></span>
-              <input type="password" name="password" id="password" class="form-control" placeholder="min 6 characters">
+              <input type="password" name="password" id="password" class="form-control" placeholder="min 6 characters" value="<?php echo htmlspecialchars($password_plain, ENT_QUOTES, 'UTF-8'); ?>">
               <button class="btn btn-light border" type="button" id="togglePwd" aria-label="Show password"><i class="bi bi-eye"></i></button>
             </div>
           </div>

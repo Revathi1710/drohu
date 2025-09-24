@@ -18,7 +18,7 @@ $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($page - 1) * $perPage;
 
 $orderIdQ = trim($_GET['order_id'] ?? '');
-$statusQ = strtolower(trim($_GET['status'] ?? ''));
+$statusQ = strtolower(trim($_GET['status'] ?? 'delivered')); // Default to 'pending'
 $fromQ = $_GET['fromdate'] ?? '';
 $toQ = $_GET['todate'] ?? '';
 $fromDb = toDbDate($fromQ);
@@ -91,12 +91,12 @@ $filtersQS = [
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>All Orders</title>
+    <title>delivered Orders</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css">
-    <style>
+      <style>
         /* Modern Zoho-like color palette */
         :root {
             --card-bg: #FFFFFF;
@@ -248,7 +248,7 @@ $filtersQS = [
     <div class="main-container">
 
         <div class="d-flex justify-content-between align-items-center mb-4 page-header">
-            <h4 class="mb-0 fw-bold">All Orders</h4>
+            <h4 class="mb-0 fw-bold">Delivered Orders</h4>
             <span class="badge counter rounded-pill fw-bold py-2 px-3"><?= (int)$totalOrders ?> total orders</span>
         </div>
 

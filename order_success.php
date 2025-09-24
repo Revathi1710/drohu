@@ -141,7 +141,7 @@ $placedAt = $order && $order['created_at'] ? date('d M Y, h:i A', strtotime($ord
 <div class="sticky">
     <div class="foot">
         <a href="order_details.php?order_id=<?= (int)$orderId ?>" style="text-decoration:none"><button class="btn btn-outline" type="button">Track order</button></a>
-        <a href="index.php" style="text-decoration:none;margin-left:auto"><button class="btn btn-primary" type="button">Continue shopping</button></a>
+        <a href="products.php" style="text-decoration:none;margin-left:auto"><button class="btn btn-primary" type="button">Continue shopping</button></a>
     </div>
 </div>
 
